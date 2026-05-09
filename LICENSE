@@ -1,0 +1,23 @@
+Copyright (c) 2026 Peter Graf
+
+This software is dual-licensed. Each user must select exactly one of the
+following licenses and use the software under its terms:
+
+  1. PolyForm Noncommercial License 1.0.0
+     Permits research, teaching, personal, and other non-commercial uses.
+     Full text: see the file LICENSE-NONCOMMERCIAL in this repository.
+     Canonical URL: https://polyformproject.org/licenses/noncommercial/1.0.0/
+
+  2. PolyForm Internal Use License 1.0.0
+     Permits use within the internal business operations of a company or
+     organization.
+     Full text: see the file LICENSE-INTERNAL-USE in this repository.
+     Canonical URL: https://polyformproject.org/licenses/internal-use/1.0.0/
+
+Any use not permitted by either license -- including resale, customer-facing
+SaaS offerings, OEM redistribution, incorporation into externally distributed
+products or services, providing the software as a service to third parties,
+or other external commercial exploitation -- requires a separate commercial
+license from the copyright holder.
+
+For commercial licensing inquiries, please contact: petergraf.mail@gmail.com

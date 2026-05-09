@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPLS Regulatory Scout</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1a1a2e;
+            color: #fff;
+            padding: 24px 32px;
+        }
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        header p {
+            font-size: 13px;
+            color: #8892b0;
+            margin-top: 4px;
+        }
+
+        .search-area {
+            max-width: 720px;
+            margin: 40px auto 0;
+            padding: 0 24px;
+        }
+
+        .search-box {
+            display: flex;
+            background: #fff;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .search-box:focus-within {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        #searchInput {
+            flex: 1;
+            padding: 14px 20px;
+            font-size: 16px;
+            border: none;
+            outline: none;
+            background: transparent;
+        }
+        #searchInput::placeholder {
+            color: #9ca3af;
+        }
+
+        #searchBtn {
+            padding: 14px 24px;
+            background: #1a1a2e;
+            color: #fff;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #searchBtn:hover { background: #2d2d5e; }
+        #searchBtn:disabled { background: #6b7280; cursor: wait; }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .filters select {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            background: #fff;
+            color: #1a1a2e;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 32px;
+        }
+        .filters select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 8px;
+            padding-left: 4px;
+        }
+
+        .fda-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #4b5563;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 4px 0;
+            font-weight: 600;
+        }
+        .fda-toggle:hover { color: #1a1a2e; }
+        .fda-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+        .fda-toggle .arrow.open { transform: rotate(90deg); }
+
+        .fda-fields {
+            display: none;
+            margin-top: 12px;
+            background: #fff;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            padding: 16px 20px;
+        }
+        .fda-fields.open { display: block; }
+
+        .fda-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .fda-grid .full-width { grid-column: 1 / -1; }
+        .fda-grid label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 3px;
+        }
+        .fda-grid input[type="text"],
+        .fda-grid input[type="date"],
+        .fda-grid select {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #fff;
+            color: #1a1a2e;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .fda-grid input:focus,
+        .fda-grid select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.12);
+        }
+        .fda-grid select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+            cursor: pointer;
+        }
+        .date-range {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .date-range span {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .date-range input { flex: 1; }
+
+        .fda-hint {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 10px;
+        }
+
+        .results-area {
+            max-width: 960px;
+            margin: 32px auto;
+            padding: 0 24px;
+        }
+
+        .summary {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3b82f6;
+            font-size: 14px;
+        }
+        .summary strong { color: #1a1a2e; }
+        .summary .num { font-weight: 700; color: #3b82f6; }
+
+        .error-msg {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+            color: #991b1b;
+        }
+
+        .active-filters {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+        .active-filters .filter-val {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+
+        .pc-toggle {
+            font-size: 13px;
+            color: #3b82f6;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 4px 0;
+            margin-bottom: 12px;
+        }
+        .pc-toggle:hover { text-decoration: underline; }
+
+        .pc-list {
+            display: none;
+            background: #f9fafb;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .pc-list.open { display: block; }
+        .pc-item {
+            display: flex;
+            gap: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .pc-item:last-child { border-bottom: none; }
+        .pc-code { font-weight: 600; min-width: 50px; color: #4b5563; }
+        .pc-name { flex: 1; }
+        .pc-field { color: #9ca3af; font-size: 12px; min-width: 100px; text-align: right; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        th {
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 14px;
+            text-align: left;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        th:hover { background: #2d2d5e; }
+        th .sort-arrow {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 10px;
+            opacity: 0.4;
+        }
+        th.sort-active .sort-arrow { opacity: 1; }
+        td {
+            padding: 10px 14px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f5;
+            vertical-align: top;
+        }
+        tr:hover td { background: #f8fafc; }
+
+        .doc-nr {
+            font-weight: 700;
+            font-family: "SF Mono", "Fira Code", monospace;
+            color: #1a1a2e;
+            white-space: nowrap;
+        }
+        .doc-nr a {
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px dotted #94a3b8;
+        }
+        .doc-nr a:hover {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+        .doc-nr a.no-link {
+            border-bottom: none;
+            cursor: default;
+        }
+        .tradename { font-weight: 500; }
+
+        .type-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .type-PMA      { background: #1a1a2e; color: #fff; }
+        .type-DeNovo    { background: #0d9488; color: #fff; }
+        .type-510k      { background: #7c3aed; color: #fff; }
+        .applicant { color: #6b7280; font-size: 12px; }
+
+        .label-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 1px 2px;
+        }
+        .label-CDx         { background: #dbeafe; color: #1e40af; }
+        .label-IVD          { background: #d1fae5; color: #065f46; }
+        .label-NucAc        { background: #ede9fe; color: #5b21b6; }
+        .label-HuGen        { background: #fce7f3; color: #9d174d; }
+        .label-Combination  { background: #fef3c7; color: #92400e; }
+        .label-CLIA         { background: #e0e7ff; color: #3730a3; }
+        .label-Influenza    { background: #ccfbf1; color: #134e4a; }
+
+        .date { white-space: nowrap; color: #6b7280; }
+
+        .suppl-badge {
+            display: inline-block;
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #d1d5db;
+            transition: all 0.15s;
+        }
+        .suppl-badge:hover { background: #e5e7eb; color: #374151; }
+        .suppl-badge.has-suppl { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+        .suppl-badge.has-suppl:hover { background: #bfdbfe; }
+
+        .suppl-row td {
+            padding: 0 !important;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .suppl-detail {
+            background: #f9fafb;
+            padding: 12px 16px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .suppl-detail table {
+            box-shadow: none;
+            border-radius: 0;
+            font-size: 12px;
+        }
+        .suppl-detail th {
+            background: #e5e7eb;
+            color: #374151;
+            font-size: 11px;
+            padding: 6px 10px;
+            cursor: default;
+        }
+        .suppl-detail th:hover { background: #e5e7eb; }
+        .suppl-detail td {
+            padding: 5px 10px;
+            font-size: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .suppl-detail .suppl-id {
+            font-family: "SF Mono", "Fira Code", monospace;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .suppl-detail .suppl-id a {
+            color: #1a1a2e;
+            text-decoration: none;
+            border-bottom: 1px dotted #94a3b8;
+        }
+        .suppl-detail .suppl-id a:hover {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 48px 24px;
+            color: #6b7280;
+            font-size: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 48px;
+            color: #6b7280;
+        }
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #d1d5db;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Loading overlay for initial DB load */
+        .db-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            z-index: 1000;
+        }
+        .db-overlay h2 { font-size: 18px; margin-bottom: 20px; font-weight: 600; }
+        .db-overlay .bar-bg {
+            width: 320px; height: 6px;
+            background: #2d2d5e; border-radius: 3px; overflow: hidden;
+        }
+        .db-overlay .bar-fill {
+            height: 100%; width: 0%;
+            background: #3b82f6; border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .db-overlay .status {
+            font-size: 13px; color: #8892b0; margin-top: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Loading overlay (shown until DB is ready) -->
+<div class="db-overlay" id="dbOverlay">
+    <h2>CPLS Regulatory Scout</h2>
+    <div class="bar-bg"><div class="bar-fill" id="loadBar"></div></div>
+    <div class="status" id="loadStatus">Initializing ...</div>
+</div>
+
+<header>
+    <h1>CPLS Regulatory Scout</h1>
+    <p>FDA Regulatory Intelligence &ndash; Product Code Join Search</p>
+</header>
+
+<div class="search-area">
+    <div class="search-box">
+        <input type="text" id="searchInput"
+               placeholder="Enter search term, e.g. sequencing, immunohistochemistry, PCR ..."
+               autofocus autocomplete="off" spellcheck="false">
+        <button id="searchBtn" disabled onclick="doSearch()">Search</button>
+    </div>
+    <div class="filters">
+        <select id="labelSelect">
+            <option value="">-- Label --</option>
+        </select>
+        <select id="specialtySelect">
+            <option value="">-- Medical Specialty --</option>
+        </select>
+    </div>
+    <p class="hint">Search term, label and/or specialty &ndash; can be used individually or combined</p>
+
+    <button class="fda-toggle" onclick="toggleFda()">
+        <span class="arrow" id="fdaArrow">&#9654;</span> FDA Search Fields
+    </button>
+
+    <div class="fda-fields" id="fdaFields">
+        <div class="fda-grid">
+            <div>
+                <label for="fdaApplicant">Applicant</label>
+                <input type="text" id="fdaApplicant" placeholder="e.g. Roche, Abbott ..." autocomplete="off">
+            </div>
+            <div>
+                <label for="fdaProductCode">Product Code</label>
+                <input type="text" id="fdaProductCode" placeholder="e.g. MJW, QAS ..." autocomplete="off">
+            </div>
+            <div>
+                <label for="fdaNumber">Number</label>
+                <input type="text" id="fdaNumber" placeholder="e.g. P190033, K201234, DEN200040 ..." autocomplete="off">
+            </div>
+            <div>
+                <label for="fdaDevice">Device</label>
+                <input type="text" id="fdaDevice" placeholder="e.g. sequencer, analyzer ..." autocomplete="off">
+            </div>
+            <div>
+                <label for="fdaDocket">Docket Number</label>
+                <input type="text" id="fdaDocket" placeholder="e.g. 85M-0556 (PMA only)" autocomplete="off">
+            </div>
+            <div>
+                <label>Decision Date</label>
+                <div class="date-range">
+                    <input type="date" id="fdaDateFrom">
+                    <span>to</span>
+                    <input type="date" id="fdaDateTo">
+                </div>
+            </div>
+            <div>
+                <label for="fdaExpedited">Expedited Review</label>
+                <select id="fdaExpedited">
+                    <option value="">-- All --</option>
+                    <option value="Y">Yes</option>
+                </select>
+            </div>
+            <div>
+                <label for="fdaAdvisory">Advisory Committee</label>
+                <select id="fdaAdvisory">
+                    <option value="">-- All --</option>
+                </select>
+            </div>
+        </div>
+        <p class="fda-hint">All filters are additive (AND). Docket Number applies to PMA only.</p>
+    </div>
+</div>
+
+<div class="results-area" id="results"></div>
+
+<!-- Dependencies: pako (zlib) + sql.js (SQLite in WASM) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.js"></script>
+
+<script>
+// ──────────────────────────────────────────────────────────
+// Configuration
+// ──────────────────────────────────────────────────────────
+const WASM_URL = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.wasm";
+const DB_FILE  = "data.db.enc";
+
+// Obfuscation key (split for non-obvious storage)
+const _a="cpls",_b="reg",_c="scout",_d="2026",_e="fda";
+const _dk=_a+_b+_c+_d+_e;
+
+const MEDICAL_SPECIALTIES = {
+    "AN":"Anesthesiology","CH":"Clinical Chemistry","CV":"Cardiovascular",
+    "DE":"Dental","EN":"Ear, Nose, Throat","GU":"Gastroenterology/Urology",
+    "HE":"Hematology","HO":"General Hospital","IM":"Immunology",
+    "MG":"Medical Genetics","MI":"Microbiology","NE":"Neurology",
+    "OB":"Obstetrics/Gynecology","OP":"Ophthalmic","OR":"Orthopedic",
+    "PA":"Pathology","PM":"Physical Medicine","RA":"Radiology",
+    "SU":"General Surgery","TX":"Clinical Toxicology"
+};
+const LABEL_NAMES = ["CDx","IVD","Combination","NucAc","HuGen","CLIA","Influenza"];
+
+// ──────────────────────────────────────────────────────────
+// DOM references
+// ──────────────────────────────────────────────────────────
+const input     = document.getElementById("searchInput");
+const btn       = document.getElementById("searchBtn");
+const resultsEl = document.getElementById("results");
+const labelSel  = document.getElementById("labelSelect");
+const specSel   = document.getElementById("specialtySelect");
+const fdaApplicant   = document.getElementById("fdaApplicant");
+const fdaProductCode = document.getElementById("fdaProductCode");
+const fdaNumber      = document.getElementById("fdaNumber");
+const fdaDevice      = document.getElementById("fdaDevice");
+const fdaDocket      = document.getElementById("fdaDocket");
+const fdaDateFrom    = document.getElementById("fdaDateFrom");
+const fdaDateTo      = document.getElementById("fdaDateTo");
+const fdaExpedited   = document.getElementById("fdaExpedited");
+const fdaAdvisory    = document.getElementById("fdaAdvisory");
+
+let db = null;
+let currentData = null;
+let sortCol = "decisiondate";
+let sortAsc = false;
+
+function toggleFda() {
+    document.getElementById("fdaFields").classList.toggle("open");
+    document.getElementById("fdaArrow").classList.toggle("open");
+}
+
+// ──────────────────────────────────────────────────────────
+// Database loading
+// ──────────────────────────────────────────────────────────
+function setLoadProgress(pct, msg) {
+    document.getElementById("loadBar").style.width = pct + "%";
+    document.getElementById("loadStatus").textContent = msg;
+}
+
+async function initDatabase() {
+    try {
+        setLoadProgress(10, "Loading search engine ...");
+        const SQL = await initSqlJs({ locateFile: () => WASM_URL });
+
+        setLoadProgress(30, "Downloading database ...");
+        const resp = await fetch(DB_FILE);
+        if (!resp.ok) throw new Error("Database file not found (HTTP " + resp.status + ")");
+        const encData = new Uint8Array(await resp.arrayBuffer());
+
+        setLoadProgress(70, "Decrypting ...");
+        const keyBytes = new TextEncoder().encode(_dk);
+        const decrypted = new Uint8Array(encData.length);
+        for (let i = 0; i < encData.length; i++) {
+            decrypted[i] = encData[i] ^ keyBytes[i % keyBytes.length];
+        }
+
+        setLoadProgress(85, "Decompressing ...");
+        const raw = pako.inflate(decrypted);
+
+        setLoadProgress(95, "Opening database ...");
+        db = new SQL.Database(raw);
+
+        loadFilters();
+        btn.disabled = false;
+
+        setLoadProgress(100, "Ready");
+        setTimeout(() => {
+            document.getElementById("dbOverlay").style.display = "none";
+        }, 300);
+
+    } catch (err) {
+        setLoadProgress(0, "Error: " + err.message);
+        console.error("DB load failed:", err);
+    }
+}
+
+function loadFilters() {
+    for (const label of LABEL_NAMES) {
+        const opt = document.createElement("option");
+        opt.value = label;
+        opt.textContent = label;
+        labelSel.appendChild(opt);
+    }
+    const sorted = Object.entries(MEDICAL_SPECIALTIES).sort((a, b) => a[1].localeCompare(b[1]));
+    for (const [code, name] of sorted) {
+        const opt1 = document.createElement("option");
+        opt1.value = code;
+        opt1.textContent = `${code} – ${name}`;
+        specSel.appendChild(opt1);
+        const opt2 = opt1.cloneNode(true);
+        fdaAdvisory.appendChild(opt2);
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// SQL helper
+// ──────────────────────────────────────────────────────────
+function queryAll(sql, params) {
+    const stmt = db.prepare(sql);
+    if (params && params.length) stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.get());
+    stmt.free();
+    return rows;
+}
+
+// ──────────────────────────────────────────────────────────
+// Date helpers
+// ──────────────────────────────────────────────────────────
+function parseDateUS(d) {
+    if (!d) return "";
+    const p = d.split("/");
+    return p.length === 3 ? p[2] + p[0].padStart(2,"0") + p[1].padStart(2,"0") : "";
+}
+function parseDateISO(d) {
+    if (!d) return "";
+    const p = d.split("-");
+    return p.length === 3 ? p[0] + p[1].padStart(2,"0") + p[2].padStart(2,"0") : "";
+}
+function checkDate(dd, fromCmp, toCmp) {
+    if (!fromCmp && !toCmp) return true;
+    const d = parseDateUS(dd);
+    if (!d) return false;
+    if (fromCmp && d < fromCmp) return false;
+    if (toCmp && d > toCmp) return false;
+    return true;
+}
+
+// ──────────────────────────────────────────────────────────
+// Batch helpers
+// ──────────────────────────────────────────────────────────
+function batchInsertTemp(tableName, values) {
+    db.run(`CREATE TEMP TABLE IF NOT EXISTS ${tableName} (v TEXT PRIMARY KEY)`);
+    db.run(`DELETE FROM ${tableName}`);
+    if (!values.length) return;
+    db.run("BEGIN");
+    const stmt = db.prepare(`INSERT OR IGNORE INTO ${tableName} VALUES (?)`);
+    for (const v of values) { stmt.run([v]); }
+    stmt.free();
+    db.run("COMMIT");
+}
+
+function getLabelsMap(numbers) {
+    if (!numbers.length) return {};
+    batchInsertTemp("_tmp_ln", numbers);
+    const rows = queryAll(
+        "SELECT l.number, l.label FROM labels l INNER JOIN _tmp_ln t ON t.v = l.number"
+    );
+    const map = {};
+    for (const [nr, lbl] of rows) {
+        if (!map[nr]) map[nr] = [];
+        map[nr].push(lbl);
+    }
+    return map;
+}
+
+function getSupplementsMap(pmaNumbers) {
+    if (!pmaNumbers.length) return {};
+    batchInsertTemp("_tmp_sn", pmaNumbers);
+    const rows = queryAll(`
+        SELECT pma_number, supplement_id, url, supplement_type,
+               supplement_reason, date_received, decision_date,
+               device, approval_order_statement
+        FROM pma_supplements
+        INNER JOIN _tmp_sn t ON t.v = pma_supplements.pma_number
+        ORDER BY supplement_number
+    `);
+    const map = {};
+    for (const r of rows) {
+        if (!map[r[0]]) map[r[0]] = [];
+        map[r[0]].push({
+            id: r[1]||"", url: r[2]||"", type: r[3]||"", reason: r[4]||"",
+            date_received: r[5]||"", date: r[6]||"", device: r[7]||"",
+            approval_order: r[8]||""
+        });
+    }
+    return map;
+}
+
+function getPcSpecialties(codes) {
+    if (!codes.length) return {};
+    batchInsertTemp("_tmp_pc", codes);
+    const rows = queryAll(
+        "SELECT pc.PRODUCTCODE, pc.MEDICALSPECIALTY FROM product_codes pc INNER JOIN _tmp_pc t ON t.v = pc.PRODUCTCODE"
+    );
+    const map = {};
+    for (const [pc, spec] of rows) map[pc] = spec || "";
+    return map;
+}
+
+// ──────────────────────────────────────────────────────────
+// Search logic (mirrors app_sqlite.py)
+// ──────────────────────────────────────────────────────────
+function doSearch() {
+    const term        = input.value.trim();
+    const label       = labelSel.value;
+    const specialty   = specSel.value;
+    const applicant   = fdaApplicant.value.trim();
+    const pcFilter    = fdaProductCode.value.trim();
+    const number      = fdaNumber.value.trim();
+    const device      = fdaDevice.value.trim();
+    const docket      = fdaDocket.value.trim();
+    const dateFrom    = fdaDateFrom.value;
+    const dateTo      = fdaDateTo.value;
+    const expedited   = fdaExpedited.value;
+    const advisory    = fdaAdvisory.value;
+
+    if (!term && !label && !specialty && !applicant && !pcFilter &&
+        !number && !device && !docket && !dateFrom && !dateTo &&
+        !expedited && !advisory) return;
+
+    btn.disabled = true;
+    resultsEl.innerHTML = '<div class="loading">Searching</div>';
+
+    // Use setTimeout to allow UI update before blocking search
+    setTimeout(() => {
+        try {
+            const data = executeSearch(
+                term, label, specialty, applicant, pcFilter, number,
+                device, docket, dateFrom, dateTo, expedited, advisory
+            );
+            renderResults(data);
+        } catch (err) {
+            resultsEl.innerHTML = `<div class="summary error-msg">Error: ${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+        }
+    }, 20);
+}
+
+function executeSearch(term, label, specialty, applicant, pcFilter, number,
+                       device, docket, dateFrom, dateTo, expedited, advisory) {
+
+    const termLower      = term.toLowerCase();
+    const applicantLower = applicant.toLowerCase();
+    const pcFilterUpper  = pcFilter.toUpperCase();
+    const numberUpper    = number.toUpperCase();
+    const deviceLower    = device.toLowerCase();
+    const docketLower    = docket.toLowerCase();
+    const dateFromCmp    = parseDateISO(dateFrom);
+    const dateToCmp      = parseDateISO(dateTo);
+
+    const hasPcSearch  = !!termLower || !!specialty;
+    const hasStructured = !!(applicantLower || pcFilterUpper || numberUpper ||
+                             deviceLower || docketLower || dateFromCmp ||
+                             dateToCmp || expedited || advisory);
+
+    if (!hasPcSearch && !hasStructured && !label) {
+        return { error: "Please enter at least one search criterion." };
+    }
+
+    // ── Step 1: Product code search ──
+    let matchedCodes = [];
+    let matchedCodeSet = null;
+
+    if (hasPcSearch) {
+        matchedCodeSet = new Set();
+        const conds = [];
+        const params = [];
+
+        if (specialty) { conds.push("MEDICALSPECIALTY = ?"); params.push(specialty); }
+        if (termLower) {
+            const like = `%${termLower}%`;
+            conds.push("(lower(DEVICENAME) LIKE ? OR lower(DEFINITION) LIKE ? OR lower(TECHNICALMETHOD) LIKE ? OR lower(TARGETAREA) LIKE ?)");
+            params.push(like, like, like, like);
+        }
+
+        const where = conds.length ? conds.join(" AND ") : "1=1";
+        let sql, allParams;
+        if (termLower) {
+            const like = `%${termLower}%`;
+            sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS,
+                CASE WHEN lower(DEVICENAME) LIKE ? THEN 'DEVICENAME'
+                     WHEN lower(DEFINITION) LIKE ? THEN 'DEFINITION'
+                     WHEN lower(TECHNICALMETHOD) LIKE ? THEN 'TECHNICALMETHOD'
+                     WHEN lower(TARGETAREA) LIKE ? THEN 'TARGETAREA'
+                END AS mf FROM product_codes WHERE ${where}`;
+            allParams = [like, like, like, like, ...params];
+        } else {
+            sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS, '' AS mf FROM product_codes WHERE ${where}`;
+            allParams = params;
+        }
+
+        for (const row of queryAll(sql, allParams)) {
+            matchedCodes.push({ code:row[0], devicename:row[1]||"", specialty:row[2]||"", "class":row[3]||"", field:row[4]||"" });
+            matchedCodeSet.add(row[0]);
+        }
+    }
+
+    // ── Step 2: Collect approvals ──
+    const skipAll = matchedCodeSet !== null && matchedCodeSet.size === 0;
+
+    if (matchedCodeSet !== null && matchedCodeSet.size > 0) {
+        batchInsertTemp("_mc", [...matchedCodeSet]);
+    }
+
+    const rawHits = [];
+
+    // --- PMA ---
+    if (!skipAll) {
+        const c = []; const p = [];
+        if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
+        if (numberUpper)    { c.push("upper(PMAnr) LIKE ?"); p.push(`%${numberUpper}%`); }
+        if (deviceLower)    { c.push("(lower(GENERICNAME) LIKE ? OR lower(TRADENAME) LIKE ?)"); p.push(`%${deviceLower}%`,`%${deviceLower}%`); }
+        if (docketLower)    { c.push("lower(DOCKETNUMBER) LIKE ?"); p.push(`%${docketLower}%`); }
+        if (advisory)       { c.push("ADVISORYCOMMITTEE = ?"); p.push(advisory); }
+        if (expedited)      { c.push("REVIEWGRANTEDYN = 'Y'"); }
+
+        const w = c.length ? c.join(" AND ") : "1=1";
+        for (const r of queryAll(`SELECT PMAnr,APPLICANT,GENERICNAME,TRADENAME,PRODUCTCODE,DATERECEIVED,DECISIONDATE,DECISIONCODE FROM pma_data WHERE ${w}`, p)) {
+            if (!checkDate(r[6], dateFromCmp, dateToCmp)) continue;
+            rawHits.push({ number:r[0], type:"PMA", tradename:r[3]||"", applicant:r[1]||"", devicename:r[2]||"", productcode:r[4]||"", datereceived:r[5]||"", decisiondate:r[6]||"", decision:r[7]||"" });
+        }
+    }
+
+    // --- De Novo ---
+    if (!skipAll && !docketLower) {
+        const c = []; const p = [];
+        if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
+        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ?"); p.push(`%${numberUpper}%`); }
+        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ?"); p.push(`%${deviceLower}%`); }
+        if (advisory)       { c.push("REVIEWADVISECOMM = ?"); p.push(advisory); }
+        if (expedited)      { c.push("EXPEDITEDREVIEW = 'Y'"); }
+
+        const w = c.length ? c.join(" AND ") : "1=1";
+        for (const r of queryAll(`SELECT KNUMBER,APPLICANT,DEVICENAME,PRODUCTCODE,DATERECEIVED,DECISIONDATE,DECISION FROM den_data WHERE ${w}`, p)) {
+            if (!checkDate(r[5], dateFromCmp, dateToCmp)) continue;
+            rawHits.push({ number:r[0], type:"De Novo", tradename:"", applicant:r[1]||"", devicename:r[2]||"", productcode:r[3]||"", datereceived:r[4]||"", decisiondate:r[5]||"", decision:r[6]||"" });
+        }
+    }
+
+    // --- 510(k) ---
+    if (!skipAll && !docketLower) {
+        const c = []; const p = [];
+        if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
+        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ?"); p.push(`%${numberUpper}%`); }
+        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ?"); p.push(`%${deviceLower}%`); }
+        if (advisory)       { c.push("REVIEWADVISECOMM = ?"); p.push(advisory); }
+        if (expedited)      { c.push("EXPEDITEDREVIEW = 'Y'"); }
+
+        const w = c.length ? c.join(" AND ") : "1=1";
+        for (const r of queryAll(`SELECT KNUMBER,APPLICANT,DEVICENAME,PRODUCTCODE,DATERECEIVED,DECISIONDATE,DECISION FROM k510_data WHERE ${w}`, p)) {
+            if (!checkDate(r[5], dateFromCmp, dateToCmp)) continue;
+            rawHits.push({ number:r[0], type:"510(k)", tradename:"", applicant:r[1]||"", devicename:r[2]||"", productcode:r[3]||"", datereceived:r[4]||"", decisiondate:r[5]||"", decision:r[6]||"" });
+        }
+    }
+
+    // ── Batch fetch labels + specialties ──
+    const allNumbers = rawHits.map(h => h.number);
+    const labelsMap = getLabelsMap(allNumbers);
+
+    const allPcs = [...new Set(rawHits.map(h => h.productcode).filter(Boolean))];
+    const pcSpecMap = getPcSpecialties(allPcs);
+
+    // Build result objects
+    let allHits = rawHits.map(h => {
+        const specCode = pcSpecMap[h.productcode] || "";
+        return {
+            ...h,
+            specialty: specCode,
+            specialty_name: MEDICAL_SPECIALTIES[specCode] || "",
+            labels: labelsMap[h.number] || [],
+            supplement_count: 0,
+            supplements: []
+        };
+    });
+
+    // Batch fetch supplements for PMA
+    const pmaNumbers = allHits.filter(h => h.type === "PMA").map(h => h.number);
+    const supplMap = getSupplementsMap(pmaNumbers);
+    for (const h of allHits) {
+        if (h.type === "PMA") {
+            const s = supplMap[h.number] || [];
+            h.supplement_count = s.length;
+            h.supplements = s;
+        }
+    }
+
+    // Label filter
+    let pmaCount  = allHits.filter(h => h.type === "PMA").length;
+    let denCount  = allHits.filter(h => h.type === "De Novo").length;
+    let k510Count = allHits.filter(h => h.type === "510(k)").length;
+
+    if (label) {
+        allHits = allHits.filter(h => h.labels.includes(label));
+        pmaCount  = allHits.filter(h => h.type === "PMA").length;
+        denCount  = allHits.filter(h => h.type === "De Novo").length;
+        k510Count = allHits.filter(h => h.type === "510(k)").length;
+    }
+
+    // Sort by date descending
+    allHits.sort((a, b) => {
+        const da = parseDateUS(a.decisiondate) || "0";
+        const db2 = parseDateUS(b.decisiondate) || "0";
+        return db2 < da ? -1 : db2 > da ? 1 : 0;
+    });
+
+    return {
+        term, label, specialty,
+        specialty_name: MEDICAL_SPECIALTIES[specialty] || "",
+        product_codes: matchedCodes,
+        product_code_count: matchedCodes.length,
+        results: allHits,
+        total_count: allHits.length,
+        pma_count: pmaCount,
+        den_count: denCount,
+        k510_count: k510Count
+    };
+}
+
+// ──────────────────────────────────────────────────────────
+// Enter key handling
+// ──────────────────────────────────────────────────────────
+function onEnter(e) { if (e.key === "Enter") doSearch(); }
+input.addEventListener("keydown", onEnter);
+for (const el of [fdaApplicant, fdaProductCode, fdaNumber, fdaDevice, fdaDocket]) {
+    el.addEventListener("keydown", onEnter);
+}
+
+// ──────────────────────────────────────────────────────────
+// Sort
+// ──────────────────────────────────────────────────────────
+const SORT_COLUMNS = [
+    { key: "number",           label: "Number" },
+    { key: "type",              label: "Type" },
+    { key: "product",           label: "Product" },
+    { key: "productcode",       label: "Product Code" },
+    { key: "specialty",          label: "Specialty" },
+    { key: "decisiondate",      label: "Date" },
+    { key: "supplement_count",  label: "Suppl." },
+    { key: "labels",            label: "Labels" },
+];
+
+function sortValue(r, key) {
+    switch (key) {
+        case "number":      return (r.number || "").toUpperCase();
+        case "type":        return r.type || "";
+        case "product":     return (r.tradename || r.devicename || "").toUpperCase();
+        case "productcode": return (r.productcode || "").toUpperCase();
+        case "specialty":   return r.specialty || "";
+        case "decisiondate": {
+            const d = r.decisiondate || "";
+            if (!d.includes("/")) return "0";
+            const p = d.split("/");
+            return p.length === 3 ? `${p[2]}${p[0].padStart(2,"0")}${p[1].padStart(2,"0")}` : "0";
+        }
+        case "supplement_count": return String(r.supplement_count || 0).padStart(6, "0");
+        case "labels":      return (r.labels || []).join(",");
+        default:            return "";
+    }
+}
+
+function doSort(key) {
+    if (sortCol === key) { sortAsc = !sortAsc; }
+    else { sortCol = key; sortAsc = true; }
+    if (currentData) {
+        currentData.results.sort((a, b) => {
+            const va = sortValue(a, sortCol);
+            const vb = sortValue(b, sortCol);
+            const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+            return sortAsc ? cmp : -cmp;
+        });
+        renderResults(currentData);
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Render (identical to original)
+// ──────────────────────────────────────────────────────────
+function renderResults(data) {
+    currentData = data;
+
+    if (data.error) {
+        resultsEl.innerHTML = `<div class="summary error-msg">${data.error}</div>`;
+        return;
+    }
+
+    let html = "";
+
+    const parts = [`<span class="num">${data.product_code_count}</span> Product Codes`];
+    if (data.pma_count > 0)  parts.push(`<span class="num">${data.pma_count}</span> PMA`);
+    if (data.den_count > 0)  parts.push(`<span class="num">${data.den_count}</span> De Novo`);
+    if (data.k510_count > 0) parts.push(`<span class="num">${data.k510_count}</span> 510(k)`);
+
+    html += `<div class="summary">`;
+    let filterParts = [];
+    if (data.term) filterParts.push(`Search term: <strong>&ldquo;${esc(data.term)}&rdquo;</strong>`);
+    if (data.label) filterParts.push(`Label: <span class="filter-val">${esc(data.label)}</span>`);
+    if (data.specialty) filterParts.push(`Specialty: <span class="filter-val">${esc(data.specialty)}${data.specialty_name ? " – " + esc(data.specialty_name) : ""}</span>`);
+    html += filterParts.join(" &nbsp;|&nbsp; ");
+    html += ` &nbsp;&rarr;&nbsp; ${parts.join(" &nbsp;|&nbsp; ")}`;
+    html += ` &nbsp;&rarr;&nbsp; <span class="num">${data.total_count}</span> results total`;
+    html += `</div>`;
+
+    if (data.product_codes && data.product_codes.length > 0) {
+        html += `<button class="pc-toggle" onclick="this.nextElementSibling.classList.toggle('open')">&#9654; Show Product Codes (${data.product_codes.length})</button>`;
+        html += `<div class="pc-list">`;
+        for (const pc of data.product_codes) {
+            html += `<div class="pc-item"><span class="pc-code">${esc(pc.code)}</span><span class="pc-name">${esc(pc.devicename)}</span><span class="pc-field">${esc(pc.field)}</span></div>`;
+        }
+        html += `</div>`;
+    }
+
+    if (data.results && data.results.length > 0) {
+        html += `<table><thead><tr>`;
+        for (const col of SORT_COLUMNS) {
+            const active = sortCol === col.key ? "sort-active" : "";
+            const arrow  = sortCol === col.key ? (sortAsc ? "&#9650;" : "&#9660;") : "&#9650;";
+            html += `<th class="${active}" onclick="doSort('${col.key}')">${col.label}<span class="sort-arrow">${arrow}</span></th>`;
+        }
+        html += `</tr></thead><tbody>`;
+
+        for (let i = 0; i < data.results.length; i++) {
+            const r = data.results[i];
+            const labels = (r.labels || []).map(l => `<span class="label-tag label-${l}">${l}</span>`).join("");
+            const typeCls = r.type === "PMA" ? "type-PMA" : r.type === "De Novo" ? "type-DeNovo" : "type-510k";
+            const name = r.tradename || r.devicename || "";
+            const subname = r.tradename ? r.devicename : "";
+            const specDisplay = r.specialty ? `<span title="${esc(r.specialty_name)}">${esc(r.specialty)}</span>` : "";
+            const fdaUrl = buildFdaUrl(r.type, r.number);
+            const numberCell = fdaUrl
+                ? `<a href="${esc(fdaUrl)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}</a>`
+                : `<span class="no-link">${esc(r.number)}</span>`;
+            const sc = r.supplement_count || 0;
+            const supplCell = sc > 0
+                ? `<span class="suppl-badge has-suppl" onclick="toggleSuppl(${i})" title="${sc} Supplements">${sc}</span>`
+                : `<span class="suppl-badge">&ndash;</span>`;
+
+            html += `<tr>
+                <td class="doc-nr">${numberCell}</td>
+                <td><span class="type-tag ${typeCls}">${esc(r.type)}</span></td>
+                <td><div class="tradename">${esc(name)}</div>${subname ? `<div class="applicant">${esc(subname)}</div>` : ""}<div class="applicant">${esc(r.applicant)}</div></td>
+                <td>${esc(r.productcode)}</td>
+                <td>${specDisplay}</td>
+                <td class="date">${formatDate(r.decisiondate)}${r.datereceived ? `<div class="applicant">Received: ${formatDate(r.datereceived)}</div>` : ""}</td>
+                <td>${supplCell}</td>
+                <td>${labels}</td>
+            </tr>`;
+
+            if (sc > 0) {
+                html += `<tr class="suppl-row" id="suppl-row-${i}" style="display:none"><td colspan="8"><div class="suppl-detail"><table><thead><tr><th>Supplement</th><th>Type</th><th>Reason</th><th>Received</th><th>Decision</th><th>Device</th><th>Approval Order Statement</th></tr></thead><tbody>`;
+                for (const s of r.supplements) {
+                    const sUrl = s.url
+                        ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}/${esc(s.id)}</a>`
+                        : `${esc(r.number)}/${esc(s.id)}`;
+                    html += `<tr><td class="suppl-id">${sUrl}</td><td>${esc(s.type)}</td><td>${esc(s.reason)}</td><td class="date">${formatDate(s.date_received)}</td><td class="date">${formatDate(s.date)}</td><td>${esc(s.device)}</td><td>${esc(s.approval_order)}</td></tr>`;
+                }
+                html += `</tbody></table></div></td></tr>`;
+            }
+        }
+        html += `</tbody></table>`;
+    } else if (data.product_code_count > 0) {
+        const hasFilter = data.label || data.specialty;
+        html += `<div class="no-results">${data.product_code_count} Product Codes found, but no approvals${hasFilter ? " matching these filter criteria" : " in the database"}.${hasFilter ? " Try different filters or remove a filter." : ""}</div>`;
+    } else {
+        html += `<div class="no-results">No results for the selected criteria. Try a different search term or different filters.</div>`;
+    }
+
+    resultsEl.innerHTML = html;
+}
+
+function buildFdaUrl(type, number) {
+    if (!number) return null;
+    if (type === "PMA") return `https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm?id=${encodeURIComponent(number)}`;
+    if (type === "De Novo") return `https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/denovo.cfm?id=${encodeURIComponent(number)}`;
+    if (type === "510(k)") return `https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID=${encodeURIComponent(number)}`;
+    return null;
+}
+
+function toggleSuppl(idx) {
+    const row = document.getElementById(`suppl-row-${idx}`);
+    if (row) row.style.display = row.style.display === "none" ? "" : "none";
+}
+
+function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function formatDate(d) {
+    if (!d) return "";
+    const parts = d.split("/");
+    if (parts.length === 3) return `${parts[1]}.${parts[0]}.${parts[2]}`;
+    return d;
+}
+
+// ──────────────────────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────────────────────
+initDatabase();
+</script>
+
+<!-- Goatcounter analytics (replace YOUR-SITE with your goatcounter subdomain) -->
+<script data-goatcounter="https://YOUR-SITE.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+</html>
