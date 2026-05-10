@@ -805,7 +805,8 @@ function doSearch() {
 function executeSearch(term, label, specialty, applicant, pcFilter, number,
                        device, docket, dateFrom, dateTo, expedited, advisory) {
 
-    const termLower      = term.toLowerCase();
+    // Comma-separated terms -> OR search (union of results)
+    const termParts      = term.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
     const applicantLower = applicant.toLowerCase();
     const pcFilterUpper  = pcFilter.toUpperCase();
     const numberUpper    = number.toUpperCase();
@@ -814,7 +815,7 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
     const dateFromCmp    = parseDateISO(dateFrom);
     const dateToCmp      = parseDateISO(dateTo);
 
-    const hasPcSearch  = !!termLower || !!specialty;
+    const hasPcSearch  = termParts.length > 0 || !!specialty;
     const hasStructured = !!(applicantLower || pcFilterUpper || numberUpper ||
                              deviceLower || docketLower || dateFromCmp ||
                              dateToCmp || expedited || advisory);
@@ -833,23 +834,32 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
         const params = [];
 
         if (specialty) { conds.push("MEDICALSPECIALTY = ?"); params.push(specialty); }
-        if (termLower) {
-            const like = `%${termLower}%`;
-            conds.push("(lower(DEVICENAME) LIKE ? OR lower(DEFINITION) LIKE ? OR lower(TECHNICALMETHOD) LIKE ? OR lower(TARGETAREA) LIKE ?)");
-            params.push(like, like, like, like);
+        if (termParts.length > 0) {
+            const orClauses = [];
+            for (const tp of termParts) {
+                const like = `%${tp}%`;
+                orClauses.push("(lower(DEVICENAME) LIKE ? OR lower(DEFINITION) LIKE ? OR lower(TECHNICALMETHOD) LIKE ? OR lower(TARGETAREA) LIKE ?)");
+                params.push(like, like, like, like);
+            }
+            conds.push("(" + orClauses.join(" OR ") + ")");
         }
 
         const where = conds.length ? conds.join(" AND ") : "1=1";
         let sql, allParams;
-        if (termLower) {
-            const like = `%${termLower}%`;
+        if (termParts.length > 0) {
+            const caseParts = [];
+            const caseParams = [];
+            for (const tp of termParts) {
+                const like = `%${tp}%`;
+                caseParts.push(`WHEN lower(DEVICENAME) LIKE ? THEN 'DEVICENAME'`);
+                caseParts.push(`WHEN lower(DEFINITION) LIKE ? THEN 'DEFINITION'`);
+                caseParts.push(`WHEN lower(TECHNICALMETHOD) LIKE ? THEN 'TECHNICALMETHOD'`);
+                caseParts.push(`WHEN lower(TARGETAREA) LIKE ? THEN 'TARGETAREA'`);
+                caseParams.push(like, like, like, like);
+            }
             sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS,
-                CASE WHEN lower(DEVICENAME) LIKE ? THEN 'DEVICENAME'
-                     WHEN lower(DEFINITION) LIKE ? THEN 'DEFINITION'
-                     WHEN lower(TECHNICALMETHOD) LIKE ? THEN 'TECHNICALMETHOD'
-                     WHEN lower(TARGETAREA) LIKE ? THEN 'TARGETAREA'
-                END AS mf FROM product_codes WHERE ${where}`;
-            allParams = [like, like, like, like, ...params];
+                CASE ${caseParts.join(" ")} END AS mf FROM product_codes WHERE ${where}`;
+            allParams = [...caseParams, ...params];
         } else {
             sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS, '' AS mf FROM product_codes WHERE ${where}`;
             allParams = params;
