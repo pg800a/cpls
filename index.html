@@ -976,6 +976,9 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
         pmaCount  = allHits.filter(h => h.type === "PMA").length;
         denCount  = allHits.filter(h => h.type === "De Novo").length;
         k510Count = allHits.filter(h => h.type === "510(k)").length;
+
+        const survivingCodes = new Set(allHits.map(h => h.productcode));
+        matchedCodes = matchedCodes.filter(pc => survivingCodes.has(pc.code));
     }
 
     // Sort by date descending
