@@ -282,6 +282,9 @@
             cursor: pointer;
             user-select: none;
             white-space: nowrap;
+            position: sticky;   /* pinned, colour-coded header per block */
+            top: 0;
+            z-index: 2;
         }
         th:hover { background: #2d2d5e; }
         th .sort-arrow {
@@ -296,6 +299,7 @@
             font-size: 13px;
             border-bottom: 1px solid #f0f0f5;
             vertical-align: top;
+            overflow-wrap: anywhere;   /* let long content wrap so tables fit the width */
         }
         tr:hover td { background: #f8fafc; }
 
@@ -328,6 +332,7 @@
             font-weight: 700;
             margin-left: 6px;
             vertical-align: middle;
+            white-space: nowrap;   /* keep "510(k)" / "De Novo" on one line */
         }
         .type-PMA      { background: #1a1a2e; color: #fff; }
         .type-DeNovo    { background: #0d9488; color: #fff; }
@@ -462,6 +467,75 @@
         .db-overlay .status {
             font-size: 13px; color: #8892b0; margin-top: 14px;
         }
+
+        /* ── Device-name block (Block 2) — calm, warm-neutral, secondary ── */
+        .dn-block { margin-top: 40px; }
+        .dn-block-head {
+            background: #f7f5f1;
+            border-left: 4px solid #c2a878;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+        }
+        .dn-block-head .dn-title { font-size: 14px; font-weight: 700; color: #6f5b3c; }
+        .dn-block-head .dn-meta { font-size: 12.5px; color: #87745a; margin-top: 6px; line-height: 1.5; }
+        .dn-block-head .dn-meta .num { font-weight: 700; }
+
+        .dn-card {
+            background: #fff;
+            border: 1px solid #e7e1d4;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .dn-card-head {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+            background: #faf8f4;
+            border-bottom: 1px solid #ece5d8;
+            font-size: 13px;
+        }
+        .dn-card-head .pc-code {
+            font-weight: 700;
+            color: #7a6242;
+            min-width: 44px;
+            font-family: "SF Mono", "Fira Code", monospace;
+            font-size: 13px;
+        }
+        .dn-card-head .dn-dev { font-weight: 600; flex: 1; min-width: 180px; font-size: 13px; }
+        .dn-card-head .dn-spec { font-size: 12px; color: #6b7280; }
+        .dn-card-head .dn-counts { font-size: 12px; color: #6b7280; }
+        .dn-card-head .dn-counts strong { color: #87745a; }
+
+        .dn-section-label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.4px; color: #9b8a72; padding: 8px 16px 4px;
+        }
+        .dn-expand {
+            font-size: 13px; color: #87745a; cursor: pointer;
+            border: none; background: none; padding: 9px 16px; font-weight: 600;
+        }
+        .dn-expand:hover { text-decoration: underline; }
+
+        .dn-bucket { display: none; }
+        .dn-bucket.open { display: block; }
+        .dn-bucket-note {
+            font-size: 12px; color: #87745a; background: #faf8f4;
+            padding: 8px 16px; font-style: italic;
+        }
+        .dn-card table { box-shadow: none; border-radius: 0; }
+        .dn-card th { background: #9c8e7a; cursor: default; }
+        .dn-card th:hover { background: #9c8e7a; }
+        /* Persistent markers so Block 2 rows stay distinguishable mid-scroll */
+        .dn-table { border-left: 3px solid #c2a878; }
+        .dn-table > tbody > tr > td { background: #fbf9f4; }
+        .dn-table > tbody > tr:hover > td { background: #f2ece1; }
+        /* Block 2 column headers are sortable (suppl-detail headers stay static) */
+        .dn-table th { cursor: pointer; }
+        .dn-table th:hover { background: #8a7d6a; }
     </style>
 </head>
 <body>
@@ -597,6 +671,9 @@ let db = null;
 let currentData = null;
 let sortCol = "decisiondate";
 let sortAsc = false;
+let sortCol2 = "decisiondate";   // independent sort state for Block 2 (device-name)
+let sortAsc2 = false;
+let rowSeq = 0;                   // unique id counter for result rows (both blocks)
 
 function toggleFda() {
     document.getElementById("fdaFields").classList.toggle("open");
@@ -725,6 +802,14 @@ function getLabelsMap(numbers) {
         if (!map[nr]) map[nr] = [];
         map[nr].push(lbl);
     }
+    // Canonical label order (matches LABEL_NAMES) so labels[] is identical
+    // across variants.
+    const labelOrder = {};
+    LABEL_NAMES.forEach((n, i) => { labelOrder[n] = i; });
+    for (const nr in map) {
+        map[nr].sort((a, b) =>
+            (labelOrder[a] ?? LABEL_NAMES.length) - (labelOrder[b] ?? LABEL_NAMES.length));
+    }
     return map;
 }
 
@@ -802,6 +887,12 @@ function doSearch() {
     }, 20);
 }
 
+function likePattern(s) {
+    // Escape LIKE metacharacters so the term matches literally (parity with
+    // app.py's substring semantics); every pattern is used with LIKE ? ESCAPE '\\'.
+    return "%" + s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
+}
+
 function executeSearch(term, label, specialty, applicant, pcFilter, number,
                        device, docket, dateFrom, dateTo, expedited, advisory) {
 
@@ -837,9 +928,9 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
         if (termParts.length > 0) {
             const orClauses = [];
             for (const tp of termParts) {
-                const like = `%${tp}%`;
-                orClauses.push("(lower(DEVICENAME) LIKE ? OR lower(DEFINITION) LIKE ? OR lower(TECHNICALMETHOD) LIKE ? OR lower(TARGETAREA) LIKE ?)");
-                params.push(like, like, like, like);
+                const like = likePattern(tp);
+                orClauses.push("(lower(DEVICENAME) LIKE ? ESCAPE '\\' OR lower(DEFINITION) LIKE ? ESCAPE '\\' OR lower(TECHNICALMETHOD) LIKE ? ESCAPE '\\' OR lower(TARGETAREA) LIKE ? ESCAPE '\\' OR lower(PHYSICALSTATE) LIKE ? ESCAPE '\\')");
+                params.push(like, like, like, like, like);
             }
             conds.push("(" + orClauses.join(" OR ") + ")");
         }
@@ -850,18 +941,19 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
             const caseParts = [];
             const caseParams = [];
             for (const tp of termParts) {
-                const like = `%${tp}%`;
-                caseParts.push(`WHEN lower(DEVICENAME) LIKE ? THEN 'DEVICENAME'`);
-                caseParts.push(`WHEN lower(DEFINITION) LIKE ? THEN 'DEFINITION'`);
-                caseParts.push(`WHEN lower(TECHNICALMETHOD) LIKE ? THEN 'TECHNICALMETHOD'`);
-                caseParts.push(`WHEN lower(TARGETAREA) LIKE ? THEN 'TARGETAREA'`);
-                caseParams.push(like, like, like, like);
+                const like = likePattern(tp);
+                caseParts.push(`WHEN lower(DEVICENAME) LIKE ? ESCAPE '\\' THEN 'DEVICENAME'`);
+                caseParts.push(`WHEN lower(DEFINITION) LIKE ? ESCAPE '\\' THEN 'DEFINITION'`);
+                caseParts.push(`WHEN lower(TECHNICALMETHOD) LIKE ? ESCAPE '\\' THEN 'TECHNICALMETHOD'`);
+                caseParts.push(`WHEN lower(TARGETAREA) LIKE ? ESCAPE '\\' THEN 'TARGETAREA'`);
+                caseParts.push(`WHEN lower(PHYSICALSTATE) LIKE ? ESCAPE '\\' THEN 'PHYSICALSTATE'`);
+                caseParams.push(like, like, like, like, like);
             }
             sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS,
-                CASE ${caseParts.join(" ")} END AS mf FROM product_codes WHERE ${where}`;
+                CASE ${caseParts.join(" ")} END AS mf FROM product_codes WHERE ${where} ORDER BY PRODUCTCODE`;
             allParams = [...caseParams, ...params];
         } else {
-            sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS, '' AS mf FROM product_codes WHERE ${where}`;
+            sql = `SELECT PRODUCTCODE, DEVICENAME, MEDICALSPECIALTY, DEVICECLASS, '' AS mf FROM product_codes WHERE ${where} ORDER BY PRODUCTCODE`;
             allParams = params;
         }
 
@@ -884,11 +976,11 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
     if (!skipAll) {
         const c = []; const p = [];
         if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
-        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
-        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
-        if (numberUpper)    { c.push("upper(PMAnr) LIKE ?"); p.push(`%${numberUpper}%`); }
-        if (deviceLower)    { c.push("(lower(GENERICNAME) LIKE ? OR lower(TRADENAME) LIKE ?)"); p.push(`%${deviceLower}%`,`%${deviceLower}%`); }
-        if (docketLower)    { c.push("lower(DOCKETNUMBER) LIKE ?"); p.push(`%${docketLower}%`); }
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ? ESCAPE '\\'"); p.push(likePattern(pcFilterUpper)); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ? ESCAPE '\\'"); p.push(likePattern(applicantLower)); }
+        if (numberUpper)    { c.push("upper(PMAnr) LIKE ? ESCAPE '\\'"); p.push(likePattern(numberUpper)); }
+        if (deviceLower)    { c.push("(lower(GENERICNAME) LIKE ? ESCAPE '\\' OR lower(TRADENAME) LIKE ? ESCAPE '\\')"); p.push(likePattern(deviceLower),likePattern(deviceLower)); }
+        if (docketLower)    { c.push("lower(DOCKETNUMBER) LIKE ? ESCAPE '\\'"); p.push(likePattern(docketLower)); }
         if (advisory)       { c.push("ADVISORYCOMMITTEE = ?"); p.push(advisory); }
         if (expedited)      { c.push("REVIEWGRANTEDYN = 'Y'"); }
 
@@ -903,10 +995,10 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
     if (!skipAll && !docketLower) {
         const c = []; const p = [];
         if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
-        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
-        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
-        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ?"); p.push(`%${numberUpper}%`); }
-        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ?"); p.push(`%${deviceLower}%`); }
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ? ESCAPE '\\'"); p.push(likePattern(pcFilterUpper)); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ? ESCAPE '\\'"); p.push(likePattern(applicantLower)); }
+        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ? ESCAPE '\\'"); p.push(likePattern(numberUpper)); }
+        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ? ESCAPE '\\'"); p.push(likePattern(deviceLower)); }
         if (advisory)       { c.push("REVIEWADVISECOMM = ?"); p.push(advisory); }
         if (expedited)      { c.push("EXPEDITEDREVIEW = 'Y'"); }
 
@@ -921,10 +1013,10 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
     if (!skipAll && !docketLower) {
         const c = []; const p = [];
         if (matchedCodeSet !== null) c.push("PRODUCTCODE IN (SELECT v FROM _mc)");
-        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ?"); p.push(`%${pcFilterUpper}%`); }
-        if (applicantLower) { c.push("lower(APPLICANT) LIKE ?"); p.push(`%${applicantLower}%`); }
-        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ?"); p.push(`%${numberUpper}%`); }
-        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ?"); p.push(`%${deviceLower}%`); }
+        if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ? ESCAPE '\\'"); p.push(likePattern(pcFilterUpper)); }
+        if (applicantLower) { c.push("lower(APPLICANT) LIKE ? ESCAPE '\\'"); p.push(likePattern(applicantLower)); }
+        if (numberUpper)    { c.push("upper(KNUMBER) LIKE ? ESCAPE '\\'"); p.push(likePattern(numberUpper)); }
+        if (deviceLower)    { c.push("lower(DEVICENAME) LIKE ? ESCAPE '\\'"); p.push(likePattern(deviceLower)); }
         if (advisory)       { c.push("REVIEWADVISECOMM = ?"); p.push(advisory); }
         if (expedited)      { c.push("EXPEDITEDREVIEW = 'Y'"); }
 
@@ -985,14 +1077,194 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
     allHits.sort((a, b) => {
         const da = parseDateUS(a.decisiondate) || "0";
         const db2 = parseDateUS(b.decisiondate) || "0";
-        return db2 < da ? -1 : db2 > da ? 1 : 0;
+        if (db2 < da) return -1;
+        if (db2 > da) return 1;
+        // Secondary key (approval number) -> total order, identical to the
+        // Python variants' tie-break.
+        return a.number < b.number ? -1 : a.number > b.number ? 1 : 0;
     });
 
-    // Limit results to prevent browser overload
+    // Limit results to prevent browser overload (Block 1)
     const MAX_RESULTS = 5000;
     const totalBeforeLimit = allHits.length;
     const truncated = totalBeforeLimit > MAX_RESULTS;
     if (truncated) allHits = allHits.slice(0, MAX_RESULTS);
+
+    // ── Block 2: device-name candidate product codes (mirrors app_sqlite.py) ──
+    let deviceNameBlock = null;
+    if (termParts.length > 0) {
+        const TOP_N = 50;
+        const block1Codes = matchedCodeSet !== null ? [...matchedCodeSet] : [];
+        batchInsertTemp("_b1", block1Codes);
+
+        const PMA_COLS = "PMAnr,APPLICANT,GENERICNAME,TRADENAME,PRODUCTCODE,DATERECEIVED,DECISIONDATE,DECISIONCODE";
+        const KN_COLS  = "KNUMBER,APPLICANT,DEVICENAME,PRODUCTCODE,DATERECEIVED,DECISIONDATE,DECISION";
+
+        const dnLike = (fields) => {
+            const ors = [], ps = [];
+            for (const tp of termParts) {
+                const like = likePattern(tp);
+                ors.push("(" + fields.map(f => `lower(${f}) LIKE ? ESCAPE '\\'`).join(" OR ") + ")");
+                for (let k = 0; k < fields.length; k++) ps.push(like);
+            }
+            return ["(" + ors.join(" OR ") + ")", ps];
+        };
+
+        const b2Struct = (pathway) => {
+            const c = [], p = [];
+            if (pcFilterUpper)  { c.push("upper(PRODUCTCODE) LIKE ? ESCAPE '\\'"); p.push(likePattern(pcFilterUpper)); }
+            if (applicantLower) { c.push("lower(APPLICANT) LIKE ? ESCAPE '\\'"); p.push(likePattern(applicantLower)); }
+            if (pathway === "PMA") {
+                if (numberUpper) { c.push("upper(PMAnr) LIKE ? ESCAPE '\\'"); p.push(likePattern(numberUpper)); }
+                if (deviceLower) { c.push("(lower(GENERICNAME) LIKE ? ESCAPE '\\' OR lower(TRADENAME) LIKE ? ESCAPE '\\')"); p.push(likePattern(deviceLower), likePattern(deviceLower)); }
+                if (docketLower) { c.push("lower(DOCKETNUMBER) LIKE ? ESCAPE '\\'"); p.push(likePattern(docketLower)); }
+                if (advisory)    { c.push("ADVISORYCOMMITTEE = ?"); p.push(advisory); }
+                if (expedited)   { c.push("REVIEWGRANTEDYN = 'Y'"); }
+                if (label)       { c.push("PMAnr IN (SELECT number FROM labels WHERE label = ?)"); p.push(label); }
+            } else {
+                if (numberUpper) { c.push("upper(KNUMBER) LIKE ? ESCAPE '\\'"); p.push(likePattern(numberUpper)); }
+                if (deviceLower) { c.push("lower(DEVICENAME) LIKE ? ESCAPE '\\'"); p.push(likePattern(deviceLower)); }
+                if (advisory)    { c.push("REVIEWADVISECOMM = ?"); p.push(advisory); }
+                if (expedited)   { c.push("EXPEDITEDREVIEW = 'Y'"); }
+                if (label)       { c.push("KNUMBER IN (SELECT number FROM labels WHERE label = ?)"); p.push(label); }
+            }
+            return [c, p];
+        };
+
+        const rawPma = (r) => ({ number:r[0], type:"PMA", tradename:r[3]||"", applicant:r[1]||"", devicename:r[2]||"", productcode:r[4]||"", datereceived:r[5]||"", decisiondate:r[6]||"", decision:r[7]||"" });
+        const rawKn  = (r, t) => ({ number:r[0], type:t, tradename:"", applicant:r[1]||"", devicename:r[2]||"", productcode:r[3]||"", datereceived:r[4]||"", decisiondate:r[5]||"", decision:r[6]||"" });
+
+        const PW = [{ name:"PMA", table:"pma_data", cols:PMA_COLS, numcol:"PMAnr", fields:["GENERICNAME","TRADENAME"], mk:rawPma, dd:(r)=>r[6] }];
+        if (!docketLower) {
+            PW.push({ name:"De Novo", table:"den_data", cols:KN_COLS, numcol:"KNUMBER", fields:["DEVICENAME"], mk:(r)=>rawKn(r,"De Novo"), dd:(r)=>r[5] });
+            PW.push({ name:"510(k)",  table:"k510_data", cols:KN_COLS, numcol:"KNUMBER", fields:["DEVICENAME"], mk:(r)=>rawKn(r,"510(k)"), dd:(r)=>r[5] });
+        }
+
+        // Step 1b: direct device-name hits, grouped by candidate code
+        const directByCode = {};
+        for (const pw of PW) {
+            const [dnFrag, dnParams] = dnLike(pw.fields);
+            const [sconds, sparams]  = b2Struct(pw.name);
+            const where = [dnFrag, "COALESCE(PRODUCTCODE,'') <> ''", "PRODUCTCODE NOT IN (SELECT v FROM _b1)"];
+            const params = [...dnParams];
+            if (specialty) { where.push("PRODUCTCODE IN (SELECT PRODUCTCODE FROM product_codes WHERE MEDICALSPECIALTY = ?)"); params.push(specialty); }
+            for (const cc of sconds) where.push(cc);
+            for (const pp of sparams) params.push(pp);
+            const sql = `SELECT ${pw.cols} FROM ${pw.table} WHERE ${where.join(" AND ")}`;
+            for (const r of queryAll(sql, params)) {
+                if (!checkDate(pw.dd(r), dateFromCmp, dateToCmp)) continue;
+                const raw = pw.mk(r);
+                (directByCode[raw.productcode] = directByCode[raw.productcode] || []).push(raw);
+            }
+        }
+
+        // Rank by direct-hit count (desc), tie-break code (asc); top-N
+        const valid = Object.keys(directByCode).map(code => ({ code, direct: directByCode[code] }));
+        valid.sort((a, b) => (b.direct.length - a.direct.length) || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+        const candidateCodeTotal = valid.length;
+        const shown = valid.slice(0, TOP_N);
+        const candidatesTruncated = candidateCodeTotal > shown.length;
+
+        // Stream each candidate's bucket (number order) under the budget
+        let remaining = Math.max(0, MAX_RESULTS - shown.reduce((s, c) => s + c.direct.length, 0));
+        let dnTruncated = false;
+        const shownData = [];
+        for (const cand of shown) {
+            const pc = cand.code;
+            const directSet = new Set(cand.direct.map(r => r.number));
+            const nondirect = [];
+            let bucketTruncated = false, stop = false;
+            for (const pw of PW) {
+                const [sconds, sparams] = b2Struct(pw.name);
+                const where = ["PRODUCTCODE = ?", ...sconds];
+                const sql = `SELECT ${pw.cols} FROM ${pw.table} WHERE ${where.join(" AND ")} ORDER BY ${pw.numcol}`;
+                for (const r of queryAll(sql, [pc, ...sparams])) {
+                    if (!checkDate(pw.dd(r), dateFromCmp, dateToCmp)) continue;
+                    const raw = pw.mk(r);
+                    if (directSet.has(raw.number)) continue;
+                    if (remaining > 0) { nondirect.push(raw); remaining--; }
+                    else { bucketTruncated = true; dnTruncated = true; stop = true; break; }
+                }
+                if (stop) break;
+            }
+            const rawSize = queryAll(
+                "SELECT (SELECT COUNT(*) FROM pma_data WHERE PRODUCTCODE=?)"
+                + " + (SELECT COUNT(*) FROM den_data WHERE PRODUCTCODE=?)"
+                + " + (SELECT COUNT(*) FROM k510_data WHERE PRODUCTCODE=?)",
+                [pc, pc, pc])[0][0];
+            shownData.push({ code: pc, direct: cand.direct, nondirect, rawSize, bucketTruncated });
+        }
+
+        // Build hit objects (batch labels / specialties / supplements)
+        const allRaws = [];
+        for (const c of shownData) { for (const r of c.direct) allRaws.push(r); for (const r of c.nondirect) allRaws.push(r); }
+        const lMap   = getLabelsMap(allRaws.map(r => r.number));
+        const sMap   = getPcSpecialties([...new Set(allRaws.map(r => r.productcode).filter(Boolean))]);
+        const supMap = getSupplementsMap(allRaws.filter(r => r.type === "PMA").map(r => r.number));
+
+        const pcInfo = {};
+        const shownCodes = shownData.map(c => c.code);
+        if (shownCodes.length) {
+            batchInsertTemp("_b2pc", shownCodes);
+            for (const row of queryAll("SELECT pc.PRODUCTCODE, pc.DEVICENAME, pc.MEDICALSPECIALTY, pc.DEVICECLASS FROM product_codes pc INNER JOIN _b2pc t ON t.v = pc.PRODUCTCODE")) {
+                pcInfo[row[0]] = { devicename: row[1]||"", specialty: row[2]||"", "class": row[3]||"" };
+            }
+        }
+
+        const buildHit = (raw, isDirect) => {
+            const sc = sMap[raw.productcode] || "";
+            const hit = {
+                number: raw.number, type: raw.type,
+                tradename: raw.tradename, applicant: raw.applicant,
+                devicename: raw.devicename, productcode: raw.productcode,
+                specialty: sc, specialty_name: MEDICAL_SPECIALTIES[sc] || "",
+                datereceived: raw.datereceived, decisiondate: raw.decisiondate,
+                decision: raw.decision, labels: lMap[raw.number] || [],
+                supplement_count: 0, supplements: [], is_direct_hit: isDirect
+            };
+            if (raw.type === "PMA") { const s = supMap[raw.number] || []; hit.supplement_count = s.length; hit.supplements = s; }
+            return hit;
+        };
+
+        const dnSort = (a, b) => {
+            const da = parseDateUS(a.decisiondate) || "0";
+            const dbk = parseDateUS(b.decisiondate) || "0";
+            if (dbk < da) return -1;
+            if (dbk > da) return 1;
+            return a.number < b.number ? -1 : a.number > b.number ? 1 : 0;
+        };
+
+        const candidates = shownData.map(c => {
+            const directHits    = c.direct.map(r => buildHit(r, true));
+            const nondirectHits = c.nondirect.map(r => buildHit(r, false));
+            const records = directHits.concat(nondirectHits);
+            records.sort(dnSort);
+            const info = pcInfo[c.code] || {};
+            const specCode = info.specialty || "";
+            return {
+                code: c.code,
+                devicename: info.devicename || "",
+                specialty: specCode,
+                specialty_name: MEDICAL_SPECIALTIES[specCode] || "",
+                "class": info["class"] || "",
+                direct_hit_count: directHits.length,
+                bucket_total: c.rawSize,
+                bucket_truncated: c.bucketTruncated,
+                records
+            };
+        });
+
+        deviceNameBlock = {
+            candidate_code_count: candidateCodeTotal,
+            candidates_shown: candidates.length,
+            candidates_truncated: candidatesTruncated,
+            top_n: TOP_N,
+            direct_hit_count: candidates.reduce((s, c) => s + c.direct_hit_count, 0),
+            truncated: dnTruncated,
+            max_results: MAX_RESULTS,
+            candidates
+        };
+    }
 
     return {
         term, label, specialty,
@@ -1005,7 +1277,8 @@ function executeSearch(term, label, specialty, applicant, pcFilter, number,
         max_results: MAX_RESULTS,
         pma_count: pmaCount,
         den_count: denCount,
-        k510_count: k510Count
+        k510_count: k510Count,
+        device_name_block: deviceNameBlock
     };
 }
 
@@ -1070,6 +1343,7 @@ function doSort(key) {
 // ──────────────────────────────────────────────────────────
 function renderResults(data) {
     currentData = data;
+    rowSeq = 0;
 
     if (data.error) {
         resultsEl.innerHTML = `<div class="summary error-msg">${data.error}</div>`;
@@ -1115,42 +1389,7 @@ function renderResults(data) {
         html += `</tr></thead><tbody>`;
 
         for (let i = 0; i < data.results.length; i++) {
-            const r = data.results[i];
-            const labels = (r.labels || []).map(l => `<span class="label-tag label-${l}">${l}</span>`).join("");
-            const typeCls = r.type === "PMA" ? "type-PMA" : r.type === "De Novo" ? "type-DeNovo" : "type-510k";
-            const name = r.tradename || r.devicename || "";
-            const subname = r.tradename ? r.devicename : "";
-            const specDisplay = r.specialty ? `<span title="${esc(r.specialty_name)}">${esc(r.specialty)}</span>` : "";
-            const fdaUrl = buildFdaUrl(r.type, r.number);
-            const numberCell = fdaUrl
-                ? `<a href="${esc(fdaUrl)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}</a>`
-                : `<span class="no-link">${esc(r.number)}</span>`;
-            const sc = r.supplement_count || 0;
-            const supplCell = sc > 0
-                ? `<span class="suppl-badge has-suppl" onclick="toggleSuppl(${i})" title="${sc} Supplements">${sc}</span>`
-                : `<span class="suppl-badge">&ndash;</span>`;
-
-            html += `<tr>
-                <td class="doc-nr">${numberCell}</td>
-                <td><span class="type-tag ${typeCls}">${esc(r.type)}</span></td>
-                <td><div class="tradename">${esc(name)}</div>${subname ? `<div class="applicant">${esc(subname)}</div>` : ""}<div class="applicant">${esc(r.applicant)}</div></td>
-                <td>${esc(r.productcode)}</td>
-                <td>${specDisplay}</td>
-                <td class="date">${formatDate(r.decisiondate)}${r.datereceived ? `<div class="applicant">Received: ${formatDate(r.datereceived)}</div>` : ""}</td>
-                <td>${supplCell}</td>
-                <td>${labels}</td>
-            </tr>`;
-
-            if (sc > 0) {
-                html += `<tr class="suppl-row" id="suppl-row-${i}" style="display:none"><td colspan="8"><div class="suppl-detail"><table><thead><tr><th>Supplement</th><th>Type</th><th>Reason</th><th>Received</th><th>Decision</th><th>Device</th><th>Approval Order Statement</th></tr></thead><tbody>`;
-                for (const s of r.supplements) {
-                    const sUrl = s.url
-                        ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}/${esc(s.id)}</a>`
-                        : `${esc(r.number)}/${esc(s.id)}`;
-                    html += `<tr><td class="suppl-id">${sUrl}</td><td>${esc(s.type)}</td><td>${esc(s.reason)}</td><td class="date">${formatDate(s.date_received)}</td><td class="date">${formatDate(s.date)}</td><td>${esc(s.device)}</td><td>${esc(s.approval_order)}</td></tr>`;
-                }
-                html += `</tbody></table></div></td></tr>`;
-            }
+            html += rowHtml(data.results[i]);
         }
         html += `</tbody></table>`;
     } else if (data.product_code_count > 0) {
@@ -1160,7 +1399,135 @@ function renderResults(data) {
         html += `<div class="no-results">No results for the selected criteria. Try a different search term or different filters.</div>`;
     }
 
+    // Block 2: additional candidate product codes via device-name evidence
+    html += renderDeviceBlock(data.device_name_block);
+
     resultsEl.innerHTML = html;
+}
+
+// Renders a single result row (+ its hidden supplement detail row).
+// Shared by Block 1 and the device-name block; rowSeq keeps ids unique.
+function rowHtml(r) {
+    const key = rowSeq++;
+    const labels = (r.labels || []).map(l => `<span class="label-tag label-${l}">${l}</span>`).join("");
+    const typeCls = r.type === "PMA" ? "type-PMA" : r.type === "De Novo" ? "type-DeNovo" : "type-510k";
+    const name = r.tradename || r.devicename || "";
+    const subname = r.tradename ? r.devicename : "";
+    const specDisplay = r.specialty ? `<span title="${esc(r.specialty_name)}">${esc(r.specialty)}</span>` : "";
+    const fdaUrl = buildFdaUrl(r.type, r.number);
+    const numberCell = fdaUrl
+        ? `<a href="${esc(fdaUrl)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}</a>`
+        : `<span class="no-link">${esc(r.number)}</span>`;
+    const sc = r.supplement_count || 0;
+    const supplCell = sc > 0
+        ? `<span class="suppl-badge has-suppl" onclick="toggleSuppl(${key})" title="${sc} Supplements">${sc}</span>`
+        : `<span class="suppl-badge">&ndash;</span>`;
+    let h = `<tr>
+        <td class="doc-nr">${numberCell}</td>
+        <td><span class="type-tag ${typeCls}">${esc(r.type)}</span></td>
+        <td><div class="tradename">${esc(name)}</div>${subname ? `<div class="applicant">${esc(subname)}</div>` : ""}<div class="applicant">${esc(r.applicant)}</div></td>
+        <td>${esc(r.productcode)}</td>
+        <td>${specDisplay}</td>
+        <td class="date">${formatDate(r.decisiondate)}${r.datereceived ? `<div class="applicant">Received: ${formatDate(r.datereceived)}</div>` : ""}</td>
+        <td>${supplCell}</td>
+        <td>${labels}</td>
+    </tr>`;
+    if (sc > 0) {
+        h += `<tr class="suppl-row" id="suppl-row-${key}" style="display:none"><td colspan="8"><div class="suppl-detail"><table><thead><tr><th>Supplement</th><th>Type</th><th>Reason</th><th>Received</th><th>Decision</th><th>Device</th><th>Approval Order Statement</th></tr></thead><tbody>`;
+        for (const s of r.supplements) {
+            const sUrl = s.url
+                ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="Open on FDA.gov">${esc(r.number)}/${esc(s.id)}</a>`
+                : `${esc(r.number)}/${esc(s.id)}`;
+            h += `<tr><td class="suppl-id">${sUrl}</td><td>${esc(s.type)}</td><td>${esc(s.reason)}</td><td class="date">${formatDate(s.date_received)}</td><td class="date">${formatDate(s.date)}</td><td>${esc(s.device)}</td><td>${esc(s.approval_order)}</td></tr>`;
+        }
+        h += `</tbody></table></div></td></tr>`;
+    }
+    return h;
+}
+
+// Sortable 8-column header for the device-name block tables (Block 2),
+// driven by its own sort state (sortCol2/sortAsc2).
+function dnHead() {
+    let h = `<thead><tr>`;
+    for (const col of SORT_COLUMNS) {
+        const active = sortCol2 === col.key ? "sort-active" : "";
+        const arrow  = sortCol2 === col.key ? (sortAsc2 ? "&#9650;" : "&#9660;") : "&#9650;";
+        h += `<th class="${active}" onclick="doSortDn('${col.key}')">${col.label}<span class="sort-arrow">${arrow}</span></th>`;
+    }
+    h += `</tr></thead>`;
+    return h;
+}
+
+function doSortDn(key) {
+    if (sortCol2 === key) { sortAsc2 = !sortAsc2; }
+    else { sortCol2 = key; sortAsc2 = true; }
+    if (currentData) renderResults(currentData);
+}
+
+// Renders Block 2: candidate product codes surfaced via device-name evidence.
+function renderDeviceBlock(b) {
+    if (!b || !b.candidate_code_count) return "";
+    let h = `<div class="dn-block">`;
+    h += `<div class="dn-block-head">
+        <div class="dn-title">Additional candidate product codes (unverified)</div>
+        <div class="dn-meta">
+            <span class="num">${b.candidate_code_count}</span> candidate product code(s)${b.candidates_truncated ? ` &ndash; showing top <span class="num">${b.candidates_shown}</span> by device-name hits` : ""}
+            &nbsp;&middot;&nbsp; <span class="num">${b.direct_hit_count}</span> device-name hit(s) shown.
+            These codes were surfaced because a device under them matches your term &ndash;
+            the code itself may be only incidentally related. Pinned rows are the device-name
+            matches; expand a code to see its full cross-pathway bucket.
+        </div>`;
+    if (b.truncated) {
+        h += `<div class="dn-meta" style="color:#c00;font-weight:600;">Some buckets were truncated at ${b.max_results} records.</div>`;
+    }
+    h += `</div>`;
+
+    for (const c of b.candidates) {
+        const dnCmp = (x, y) => {
+            const vx = sortValue(x, sortCol2), vy = sortValue(y, sortCol2);
+            const cc = vx < vy ? -1 : vx > vy ? 1 : 0;
+            return sortAsc2 ? cc : -cc;
+        };
+        const directRows = c.records.filter(r => r.is_direct_hit).sort(dnCmp);
+        const bucketRows = c.records.filter(r => !r.is_direct_hit).sort(dnCmp);
+        const cardId = "dncard-" + c.code;
+
+        h += `<div class="dn-card">`;
+        h += `<div class="dn-card-head">
+            <span class="pc-code">${esc(c.code)}</span>
+            <span class="dn-dev">${esc(c.devicename)}</span>
+            <span class="dn-spec">${esc(c.specialty)}${c.specialty_name ? " &ndash; " + esc(c.specialty_name) : ""}${c["class"] ? " &middot; Class " + esc(c["class"]) : ""}</span>
+            <span class="dn-counts"><strong>${c.direct_hit_count}</strong> device-name hit(s) &middot; <strong>${c.bucket_total}</strong> total under code</span>
+        </div>`;
+
+        h += `<div class="dn-section-label">Device-name matches</div>`;
+        h += `<table class="dn-table">${dnHead()}<tbody>`;
+        for (const r of directRows) h += rowHtml(r);
+        h += `</tbody></table>`;
+
+        if (bucketRows.length > 0) {
+            h += `<button class="dn-expand" data-n="${bucketRows.length}" data-trunc="${c.bucket_truncated ? 1 : 0}" onclick="toggleBucket('${cardId}', this)">&#9654; Show full product-code bucket (${bucketRows.length} more${c.bucket_truncated ? ", truncated" : ""})</button>`;
+            h += `<div class="dn-bucket" id="${cardId}">`;
+            h += `<div class="dn-bucket-note">Candidate / unverified &ndash; all records under product code ${esc(c.code)}; not necessarily related to your term.</div>`;
+            h += `<table class="dn-table">${dnHead()}<tbody>`;
+            for (const r of bucketRows) h += rowHtml(r);
+            h += `</tbody></table></div>`;
+        }
+        h += `</div>`;
+    }
+    h += `</div>`;
+    return h;
+}
+
+function toggleBucket(id, btnEl) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const open = el.classList.toggle("open");
+    const n  = btnEl.getAttribute("data-n");
+    const tr = btnEl.getAttribute("data-trunc") === "1" ? ", truncated" : "";
+    btnEl.innerHTML = open
+        ? `&#9660; Hide product-code bucket`
+        : `&#9654; Show full product-code bucket (${n} more${tr})`;
 }
 
 function buildFdaUrl(type, number) {
